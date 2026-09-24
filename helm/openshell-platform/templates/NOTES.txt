@@ -1,0 +1,20 @@
+OpenShell platform installed (release {{ .Release.Name }}, namespace {{ .Release.Namespace }}).
+
+Verify the three pieces:
+
+  # 1. agent-sandbox controller + CRD
+  oc get crd sandboxes.agents.x-k8s.io
+  oc get pods -n agent-sandbox-system
+
+  # 2. OpenShell gateway
+  oc get statefulset,pods -n {{ .Release.Namespace }}
+
+  # 3. privileged SCC grant for sandbox pods
+{{- if .Values.scc.grantPrivileged }}
+  oc get rolebinding {{ .Values.scc.sandboxServiceAccount }}-scc-privileged -n {{ .Release.Namespace }}
+{{- else }}
+  (scc.grantPrivileged is disabled — grant the SCC to {{ .Values.scc.sandboxServiceAccount }} yourself)
+{{- end }}
+
+Next (out of scope for this chart): build/publish the Morty image (E2) and provision
+per-user sandboxes (handled by the studio-gateway provisioner).

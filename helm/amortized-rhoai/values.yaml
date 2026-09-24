@@ -1,0 +1,83 @@
+# Amortized RHOAI tier — one install (see README.md).
+#
+# Requires cluster-admin: the OpenShell platform installs a CRD + privileged SCC, and
+# the embedded-nav registration modifies the shared RHOAI dashboard Deployment.
+#
+# The per-user core app stack is NOT bundled here — the gateway pulls the core chart
+# from OCI at runtime (studio-gateway.chart.*). The standalone core chart is untouched.
+
+# --- OpenShell mTLS client cert copy ----------------------------------------------
+# OpenShell is shared cluster infra installed separately into its own namespace (the
+# openshell-platform chart; install.sh runs it). Its certgen mints `openshell-client-tls`
+# there; a K8s Secret can't be mounted cross-namespace, so a pre-install hook copies it
+# into THIS release's namespace where the gateway pod mounts it. No manual step.
+openshellClientTls:
+  copy: true
+  sourceNamespace: openshell        # where openshell-platform is installed
+  secretName: openshell-client-tls  # must match studio-gateway.openshell.clientTlsSecret
+  image: quay.io/openshift/origin-cli:latest
+  imagePullPolicy: IfNotPresent
+
+# --- studio-gateway: the shared-tier per-user provisioner --------------------------
+studio-gateway:
+  enabled: true
+  image:
+    # Published gateway image (public): studio-gateway:latest, published on main by #444.
+    tag: latest
+  chart:
+    # The core app chart version the gateway installs per user (pulled from OCI).
+    version: "0.2.0"
+  mlflow:
+    trackingUri: ""   # https URI of the RHOAI operator MLflow (enterprise mode)
+    upstream: ""      # https origin for the /mlflow UI proxy (empty => /mlflow off)
+  morty:
+    modelProvider: vertex          # vertex | openai | anthropic
+    googleCloudProject: ""         # required for vertex
+  # The gateway proxies /federated -> the plugin frontend Service (deployed by the
+  # pluginFrontend component below). Same-namespace short DNS name; keep in sync with
+  # pluginFrontend.serviceName.
+  pluginUpstream: "http://amortized-studio-plugin:8080"
+
+# --- Plugin frontend (Module Federation remote) -----------------------------------
+# The dashboard nav loads Studio's remoteEntry.js from here (via the gateway's
+# /federated proxy). A small nginx Deployment serving the built MF bundle.
+pluginFrontend:
+  enabled: true
+  serviceName: amortized-studio-plugin
+  port: 8080
+  replicas: 1
+  image:
+    repository: ghcr.io/amortized-ai/amortized-studio
+    tag: latest            # amortized-studio:latest, published on main by #448
+    pullPolicy: Always
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 100m, memory: 128Mi }
+
+# --- Embedded-nav registration in the RHOAI dashboard -----------------------------
+# Registers the "amortizedStudio" module-federation remote so Studio appears as a
+# dashboard nav item, routed through the gateway (hybrid model). Implemented as a
+# post-install/upgrade Job that sets MODULE_FEDERATION_CONFIG on the dashboard
+# Deployment (the SME-sanctioned path).
+#
+# CAVEAT: this forces the dashboard operator to Ready=False for as long as the plugin
+# is registered — it cannot reconcile/upgrade the dashboard until uninstalled. The
+# pre-delete hook removes the entry and restores operator health.
+navRegistration:
+  enabled: true
+  moduleName: amortizedStudio
+  dashboard:
+    namespace: redhat-ods-applications   # ODH: opendatahub
+    deployment: rhods-dashboard          # ODH: odh-dashboard
+    container: rhods-dashboard           # container in the deploy to stamp (ODH: odh-dashboard)
+    federationConfigMap: federation-config
+  # Image with `oc` + python3 (the config-merge tool). Overridable.
+  image: quay.io/openshift/origin-cli:latest
+  imagePullPolicy: IfNotPresent
+  # Optional: the gateway http Service the nav entry points at. Empty => derived from
+  # the studio-gateway release name (<release>-studio-gateway-http).
+  gatewayServiceName: ""
+
+# Optional name overrides for this umbrella's own resources.
+nameOverride: ""
+fullnameOverride: ""

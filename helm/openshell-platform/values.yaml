@@ -1,0 +1,53 @@
+# OpenShell platform prerequisites (E1) for sandboxed Morty on RHOAI/OpenShift.
+# One release encodes the three cluster-admin steps we previously ran by hand:
+#   1. agent-sandbox controller + CRD (kubernetes-sigs v0.5.6)
+#   2. the OpenShell gateway (NVIDIA subchart)
+#   3. the privileged SCC grant for sandbox pods
+#
+# Install (cluster-admin, once per cluster):
+#   helm dependency build helm/openshell-platform
+#   helm install openshell-platform helm/openshell-platform -n openshell --create-namespace
+
+# agent-sandbox (kubernetes-sigs) v0.5.6 controller stack. Its CRD ships under crds/
+# (Helm installs crds/ before templates). Set false if the cluster already has agent-sandbox.
+agentSandbox:
+  install: true
+
+# Grant the OpenShift 'privileged' SCC to the sandbox pods' ServiceAccount.
+# Declarative equivalent of:
+#   oc adm policy add-scc-to-user privileged -z <sandboxServiceAccount> -n <release namespace>
+scc:
+  grantPrivileged: true
+  # Must match the gateway subchart's generated sandbox SA (openshell.fullnameOverride + "-sandbox").
+  sandboxServiceAccount: openshell-sandbox
+
+# --- OpenShell gateway (NVIDIA) subchart values ---
+# RHOAI-documented eval config, matching the install validated on cluster 1:
+#   TLS on (mTLS transport), API auth off, SCC-friendly securityContext.
+openshell:
+  enabled: true
+  # Fixes the generated names to "openshell" (StatefulSet) / "openshell-sandbox" (sandbox SA),
+  # independent of the Helm release name.
+  fullnameOverride: openshell
+  # Let the OpenShift SCC inject a valid uid/fsGroup — the chart defaults (1000) are
+  # outside a typical namespace uid range and would be rejected by restricted-v2.
+  # IMPORTANT: Helm's subchart value-merge IGNORES a file-level `null` here (the subchart
+  # default 1000 wins), so these MUST be cleared via --set at install time:
+  #   --set openshell.podSecurityContext.fsGroup=null --set openshell.securityContext.runAsUser=null
+  # install.sh does this for you. The keys below document intent only.
+  podSecurityContext:
+    fsGroup: null
+  securityContext:
+    runAsUser: null
+  server:
+    # mTLS transport (chart default; set explicitly for clarity).
+    disableTls: false
+    auth:
+      # Eval auth: API auth off (transport mTLS still required).
+      allowUnauthenticatedUsers: true
+  # This release installs agent-sandbox itself, so the CRD/API is not live when Helm
+  # renders the gateway templates — disable the gateway's live-API preflight, which
+  # would otherwise fail before crds/ is applied.
+  agentSandbox:
+    preflight:
+      enabled: false

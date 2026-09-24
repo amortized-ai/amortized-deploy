@@ -1,0 +1,22 @@
+Amortized Studio gateway installed:
+  release:    {{ .Release.Name }}
+  namespace:  {{ .Release.Namespace }}
+  image:      {{ printf "%s:%s" .Values.image.repository .Values.image.tag }}
+  core chart: {{ .Values.chart.oci }} @ {{ .Values.chart.version }}
+  model:      {{ .Values.morty.modelProvider }} ({{ .Values.morty.model }})
+
+Route (SSO entry point):
+  oc get route {{ include "studio-gateway.fullname" . }} -n {{ .Release.Namespace }} -o jsonpath='https://{.spec.host}{"\n"}'
+
+Prerequisites (must exist in {{ .Release.Namespace }}):
+  - Secret/{{ .Values.openshell.clientTlsSecret }}  (OpenShell mTLS client cert; copy from the openshell-platform install)
+{{- if eq .Values.morty.modelProvider "vertex" }}
+  - Secret/{{ .Values.morty.adcSecret }}            (Vertex ADC; optional but required for vertex chat)
+{{- else }}
+  - Secret/{{ .Values.morty.keySecret | default "<your key secret>" }}  (holds OPENAI_API_KEY / ANTHROPIC_API_KEY)
+{{- end }}
+  - the OpenShell platform (E1) + operator MLflow reachable on the cluster
+
+Verify:
+  oc rollout status deploy/{{ include "studio-gateway.fullname" . }} -n {{ .Release.Namespace }}
+  # then browse the Route and sign in; the gateway provisions amz-<user> on first hit.

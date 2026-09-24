@@ -1,0 +1,22 @@
+{{- if .Values.scc.grantPrivileged }}
+# Declarative equivalent of:
+#   oc adm policy add-scc-to-user privileged -z {{ .Values.scc.sandboxServiceAccount }} -n {{ .Release.Namespace }}
+# Sandbox pods run privileged (nested-container supervisor); the gateway subchart creates
+# the ServiceAccount, this binds it to the OpenShift 'privileged' SCC ClusterRole.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.scc.sandboxServiceAccount }}-scc-privileged
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/part-of: openshell-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.scc.sandboxServiceAccount }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

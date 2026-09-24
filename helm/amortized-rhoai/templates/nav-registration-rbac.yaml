@@ -1,0 +1,46 @@
+{{- if .Values.navRegistration.enabled }}
+# RBAC for the nav-registration Jobs. Normal (non-hook) resources so they exist both
+# for the post-install/upgrade register Job and the pre-delete deregister Job. Scoped
+# tightly: get/patch the one dashboard Deployment + get the federation-config CM, in
+# the dashboard namespace only.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "amortized-rhoai.navServiceAccount" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-nav-reg
+  namespace: {{ .Values.navRegistration.dashboard.namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: [{{ .Values.navRegistration.dashboard.deployment | quote }}]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: [{{ .Values.navRegistration.dashboard.federationConfigMap | quote }}]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-nav-reg
+  namespace: {{ .Values.navRegistration.dashboard.namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "amortized-rhoai.navServiceAccount" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "amortized-rhoai.fullname" . }}-nav-reg
+{{- end }}

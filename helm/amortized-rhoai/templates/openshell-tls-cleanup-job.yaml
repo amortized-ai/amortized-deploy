@@ -1,0 +1,87 @@
+{{- if .Values.openshellClientTls.copy }}
+# Pre-delete hook: remove the copied openshell-client-tls Secret from this release's
+# namespace. The copy hook creates it imperatively via `oc apply` (not release-tracked),
+# so `helm uninstall` would otherwise orphan it. Self-contained SA + Role + RoleBinding +
+# Job, all pre-delete hooks, cleaned up after they run.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ .Values.openshellClientTls.secretName | quote }}]
+    verbs: ["get", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "amortized-rhoai.fullname" . }}-tls-cleanup
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-cleanup
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        {{- include "amortized-rhoai.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "amortized-rhoai.fullname" . }}-tls-cleanup
+      restartPolicy: Never
+      containers:
+        - name: cleanup
+          image: {{ .Values.openshellClientTls.image | quote }}
+          imagePullPolicy: {{ .Values.openshellClientTls.imagePullPolicy }}
+          command:
+            - oc
+            - delete
+            - secret
+            - {{ .Values.openshellClientTls.secretName | quote }}
+            - -n
+            - {{ .Release.Namespace | quote }}
+            - --ignore-not-found
+{{- end }}

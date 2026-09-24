@@ -1,0 +1,12 @@
+apiVersion: v2
+name: studio-gateway
+description: >-
+  Amortized Studio gateway — the RHOAI shared tier that authenticates each dashboard
+  user (oauth-proxy) and provisions their isolated amz-<user> backend on demand: it
+  installs the amortized core chart per user (pulled from OCI, enterprise-MLflow mode)
+  and creates their OpenShell-sandboxed Morty. Namespace-parameterized (installs into
+  the release namespace); pairs with the openshell-platform chart (E1).
+type: application
+version: 0.1.0
+# The gateway image is versioned/published independently (ghcr.io/amortized-ai/studio-gateway).
+appVersion: "0.1.0"

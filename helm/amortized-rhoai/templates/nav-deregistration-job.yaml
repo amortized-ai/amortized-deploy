@@ -1,0 +1,59 @@
+{{- if .Values.navRegistration.enabled }}
+# Pre-delete hook: remove our MODULE_FEDERATION_CONFIG literal override on the
+# dashboard Deployment so the operator's managed valueFrom (the federation-config
+# ConfigMap) takes over again and the dashboard operator returns to Ready=True. The
+# CM baseline (other modules) is preserved by the operator.
+#
+# NOTE: if other plugins were also registered by hand via the same literal env, they
+# are dropped too — re-register them after. (The common case is amortizedStudio only.)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-nav-deregister
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        {{- include "amortized-rhoai.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "amortized-rhoai.navServiceAccount" . }}
+      restartPolicy: Never
+      containers:
+        - name: deregister
+          image: {{ .Values.navRegistration.image | quote }}
+          imagePullPolicy: {{ .Values.navRegistration.imagePullPolicy }}
+          env:
+            - name: DASHBOARD_NS
+              value: {{ .Values.navRegistration.dashboard.namespace | quote }}
+            - name: DASHBOARD_DEPLOY
+              value: {{ .Values.navRegistration.dashboard.deployment | quote }}
+            - name: DASHBOARD_CONTAINER
+              value: {{ .Values.navRegistration.dashboard.container | quote }}
+          command:
+            - python3
+            - -c
+            - |
+              import os, subprocess, sys
+
+              ns = os.environ["DASHBOARD_NS"]
+              dep = os.environ["DASHBOARD_DEPLOY"]
+              container = os.environ["DASHBOARD_CONTAINER"]
+
+              # Remove the literal override from the dashboard container; the operator
+              # restores its valueFrom.
+              r = subprocess.run(
+                  ["oc", "set", "env", "deploy/" + dep, "-n", ns, "-c", container, "MODULE_FEDERATION_CONFIG-"],
+                  capture_output=True, text=True)
+              sys.stdout.write(r.stdout)
+              sys.stderr.write(r.stderr)
+              # Tolerate absence on teardown (nothing to remove).
+              sys.exit(0)
+{{- end }}

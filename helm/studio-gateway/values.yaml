@@ -1,0 +1,78 @@
+# Amortized Studio gateway (RHOAI shared tier). Installs into the release namespace
+# (helm install -n <ns>); nothing here hardcodes a namespace. See values-example.yaml
+# for a filled-in example.
+
+# Optional name overrides for the generated resources (cluster-scoped names are
+# derived from these, so multiple installs never collide).
+nameOverride: ""
+fullnameOverride: ""
+
+# Gateway image (built + published by amortized CI).
+image:
+  repository: ghcr.io/amortized-ai/studio-gateway
+  tag: latest
+  pullPolicy: Always
+
+oauthProxy:
+  image: quay.io/openshift/origin-oauth-proxy:latest
+
+# Base path the embedded Studio SPA is served under (RHOAI dashboard proxy prefix).
+embedBasePath: /amortized-studio-embed
+
+# The amortized CORE chart the gateway installs per user, pulled from OCI.
+chart:
+  oci: oci://ghcr.io/amortized-ai/charts/amortized
+  # REQUIRED: pin the core chart version the gateway installs. Rendering fails if empty.
+  version: ""
+
+# Enterprise (RHOAI operator) MLflow — the shared upstream.
+mlflow:
+  # https tracking URI the server/jobs log to (SHARED_MLFLOW_TRACKING_URI).
+  trackingUri: ""
+  # https origin the gateway's /mlflow UI proxy targets (MLFLOW_UPSTREAM). Often the
+  # same host as trackingUri without the /mlflow suffix. Empty => /mlflow disabled.
+  upstream: ""
+  # Service-CA bundle the gateway trusts for the operator MLflow TLS (mounted from the
+  # openshift-service-ca.crt configmap present in every namespace).
+  caFile: /etc/mlflow-ca/service-ca.crt
+
+# OpenShell (per-user sandboxed Morty). The gateway resolves the gateway Service's
+# ClusterIP at runtime, so no IP is hardcoded.
+openshell:
+  gateway: openshift                                        # CLI gateway profile name
+  endpoint: https://openshell.openshell.svc.cluster.local:8080
+  namespace: openshell                                      # ns of the gateway Service
+  service: openshell                                        # gateway Service name
+  clientTlsSecret: openshell-client-tls                     # mTLS client cert (from E1); mounted here
+  mtlsDir: /etc/openshell-mtls
+
+# Morty model provider (deployment-level): vertex | openai | anthropic.
+morty:
+  image: ghcr.io/amortized-ai/morty:latest
+  modelProvider: vertex
+  model: google-vertex-anthropic/claude-opus-4-8@default
+  # --- vertex ---
+  adcSecret: morty-adc                                      # Vertex ADC (mounted optional); created out of band
+  adcFile: /etc/morty-adc/adc.json
+  googleCloudProject: ""
+  vertexLocation: global
+  # --- openai / anthropic ---
+  # A secret whose keys (OPENAI_API_KEY / ANTHROPIC_API_KEY) are loaded into the gateway
+  # env so the openshell CLI's --auto-providers attaches them to each sandbox. Empty for vertex.
+  keySecret: ""
+
+# One GPU per user by default (per-user ResourceQuota the provisioner applies).
+gpuPerUser: "1"
+
+# Optional passthroughs.
+teacherKeysDir: ""        # dir of provider-key files the gateway stamps into each user ns (SDG teacher)
+serverImageTag: ""        # override the core chart's server image tag
+pluginUpstream: ""        # PLUGIN_UPSTREAM: the dashboard MF-remote plugin frontend (optional)
+
+resources:
+  gateway:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  oauthProxy:
+    requests: { cpu: 10m, memory: 64Mi }
+    limits: { cpu: 100m, memory: 128Mi }

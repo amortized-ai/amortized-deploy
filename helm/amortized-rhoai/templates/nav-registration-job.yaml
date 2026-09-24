@@ -1,0 +1,94 @@
+{{- if .Values.navRegistration.enabled }}
+# Post-install/upgrade hook: idempotently upsert the amortizedStudio entry into the
+# dashboard's MODULE_FEDERATION_CONFIG (env-set literal — the SME-sanctioned path).
+# Runs after the main release resources (RBAC + subcharts) are in place.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-nav-register
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "amortized-rhoai.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "amortized-rhoai.navServiceAccount" . }}
+      restartPolicy: Never
+      containers:
+        - name: register
+          image: {{ .Values.navRegistration.image | quote }}
+          imagePullPolicy: {{ .Values.navRegistration.imagePullPolicy }}
+          env:
+            - name: ENTRY_JSON
+              value: {{ include "amortized-rhoai.navEntry" . | quote }}
+            - name: DASHBOARD_NS
+              value: {{ .Values.navRegistration.dashboard.namespace | quote }}
+            - name: DASHBOARD_DEPLOY
+              value: {{ .Values.navRegistration.dashboard.deployment | quote }}
+            - name: DASHBOARD_CONTAINER
+              value: {{ .Values.navRegistration.dashboard.container | quote }}
+            - name: MF_CM
+              value: {{ .Values.navRegistration.dashboard.federationConfigMap | quote }}
+            - name: MODULE_NAME
+              value: {{ .Values.navRegistration.moduleName | quote }}
+          command:
+            - python3
+            - -c
+            - |
+              import json, os, subprocess, sys
+
+              ns = os.environ["DASHBOARD_NS"]
+              dep = os.environ["DASHBOARD_DEPLOY"]
+              container = os.environ["DASHBOARD_CONTAINER"]
+              cm = os.environ["MF_CM"]
+              name = os.environ["MODULE_NAME"]
+              entry = json.loads(os.environ["ENTRY_JSON"])
+
+              def run(*args):
+                  return subprocess.run(args, capture_output=True, text=True)
+
+              # Baseline config: the current literal env override if present (re-runs),
+              # else the operator-managed federation-config ConfigMap.
+              dj = run("oc", "get", "deploy", dep, "-n", ns, "-o", "json")
+              if dj.returncode:
+                  sys.stderr.write(dj.stderr)
+                  sys.exit(dj.returncode)
+              containers = json.loads(dj.stdout)["spec"]["template"]["spec"]["containers"]
+              c = next((x for x in containers if x.get("name") == container), None)
+              if c is None:
+                  sys.exit("dashboard container '%s' not found in deploy/%s" % (container, dep))
+              cur = next((e.get("value") for e in c.get("env", []) if e.get("name") == "MODULE_FEDERATION_CONFIG"), None)
+              if not cur:
+                  # Baseline must come from the CM. Fail CLOSED if it can't be read or lacks
+                  # the key: defaulting to [] would drop every other dashboard module, and the
+                  # operator (Ready=False while our override is set) could not restore them.
+                  cmj = run("oc", "get", "cm", cm, "-n", ns, "-o", "json")
+                  if cmj.returncode:
+                      sys.stderr.write(cmj.stderr)
+                      sys.exit("cannot read baseline ConfigMap '%s' in '%s'; refusing to overwrite nav config" % (cm, ns))
+                  cur = json.loads(cmj.stdout).get("data", {}).get("module-federation-config.json")
+                  if cur is None:
+                      sys.exit("ConfigMap '%s' has no 'module-federation-config.json' key; refusing to overwrite nav config" % cm)
+              config = json.loads(cur)
+
+              # Idempotent upsert: drop any existing entry with our name, append ours.
+              config = [e for e in config if e.get("name") != name]
+              config.append(entry)
+
+              # Target the dashboard container explicitly (-c) so sidecars are untouched.
+              r = run("oc", "set", "env", "deploy/" + dep, "-n", ns, "-c", container,
+                      "MODULE_FEDERATION_CONFIG=" + json.dumps(config))
+              sys.stdout.write(r.stdout)
+              sys.stderr.write(r.stderr)
+              if r.returncode:
+                  sys.exit(r.returncode)
+              print("registered '%s'" % name)
+{{- end }}

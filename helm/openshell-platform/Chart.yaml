@@ -1,0 +1,17 @@
+apiVersion: v2
+name: openshell-platform
+description: >-
+  OpenShell platform prerequisites (the cluster-admin "E1" step) for sandboxed Morty
+  on RHOAI/OpenShift, as one Helm release: the agent-sandbox controller
+  (kubernetes-sigs v0.5.6), the OpenShell gateway, and the privileged SCC grant for
+  sandbox pods. Replaces the imperative kubectl-apply / oc-adm / helm-install steps.
+type: application
+version: 0.1.0
+# Tracks the agent-sandbox release vendored under crds/ + templates/.
+appVersion: "0.5.6"
+dependencies:
+  - name: helm-chart
+    alias: openshell
+    version: 0.0.113
+    repository: oci://ghcr.io/nvidia/openshell
+    condition: openshell.enabled

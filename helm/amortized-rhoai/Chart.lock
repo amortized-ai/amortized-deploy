@@ -1,0 +1,6 @@
+dependencies:
+- name: studio-gateway
+  repository: file://../studio-gateway
+  version: 0.1.0
+digest: sha256:d4405a601a3ede82a1e94f6422105cc89d9c8bc0171d45a9154ff913f7817a4a
+generated: "2026-09-15T18:26:04.761347-04:00"

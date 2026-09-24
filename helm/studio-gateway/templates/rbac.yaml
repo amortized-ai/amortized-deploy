@@ -1,0 +1,92 @@
+# Cluster-scoped RBAC for the gateway SA. Names are release-derived so multiple
+# installs (different namespaces) never collide. Subjects reference the SA in the
+# release namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "studio-gateway.fullname" . }}-provisioner
+  labels:
+    {{- include "studio-gateway.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "resourcequotas", "configmaps", "secrets", "serviceaccounts", "services", "persistentvolumeclaims"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "escalate", "bind"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  # Bind the enterprise MLflow access ClusterRoles into each user namespace.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["mlflow-operator-mlflow-view", "mlflow-operator-mlflow-edit"]
+    verbs: ["bind"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "studio-gateway.fullname" . }}-auth-delegator
+  labels:
+    {{- include "studio-gateway.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "studio-gateway.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "studio-gateway.fullname" . }}-provisioner
+  labels:
+    {{- include "studio-gateway.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "studio-gateway.fullname" . }}-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "studio-gateway.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# Cluster-wide MLflow access so the gateway's injected SA token passes SSAR for any
+# user's workspace on the /mlflow UI proxy (workspace scoping is per-request).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "studio-gateway.fullname" . }}-mlflow-view
+  labels:
+    {{- include "studio-gateway.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mlflow-operator-mlflow-view
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "studio-gateway.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "studio-gateway.fullname" . }}-mlflow-edit
+  labels:
+    {{- include "studio-gateway.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mlflow-operator-mlflow-edit
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "studio-gateway.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}

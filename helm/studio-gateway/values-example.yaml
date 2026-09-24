@@ -1,0 +1,38 @@
+# Worked example for the studio-gateway chart — copy this and fill in the <placeholders>.
+#   helm install amortized-gateway helm/studio-gateway -n <gateway-ns> \
+#     -f helm/studio-gateway/values-example.yaml --set chart.version=<core-chart-version>
+#
+# For the full RHOAI install (this chart + OpenShell + dashboard nav) use the umbrella
+# instead: helm/amortized-rhoai/install.sh <gateway-ns>
+
+chart:
+  oci: oci://ghcr.io/amortized-ai/charts/amortized
+  # version: pin at install time (--set chart.version=...) or here.
+
+# Enterprise MLflow (the RHOAI operator MLflow). The umbrella install.sh auto-discovers
+# this from the app=mlflow,component=mlflow Service; set it explicitly only if discovery
+# can't reach it (the values below are the standard RHOAI operator MLflow service).
+mlflow:
+  trackingUri: https://mlflow.redhat-ods-applications.svc:8443/mlflow
+  upstream: https://mlflow.redhat-ods-applications.svc:8443
+
+openshell:
+  gateway: openshift
+  endpoint: https://openshell.openshell.svc.cluster.local:8080
+  namespace: openshell
+  service: openshell
+  clientTlsSecret: openshell-client-tls
+
+morty:
+  image: ghcr.io/amortized-ai/morty:latest
+  modelProvider: vertex
+  model: google-vertex-anthropic/claude-opus-4-8@default
+  adcSecret: morty-adc
+  googleCloudProject: <your-gcp-project>   # required for modelProvider: vertex
+  vertexLocation: global
+
+# openai instead of vertex would be, e.g.:
+# morty:
+#   modelProvider: openai
+#   model: openai/gpt-5.1
+#   keySecret: amortized-llm-keys   # holds OPENAI_API_KEY

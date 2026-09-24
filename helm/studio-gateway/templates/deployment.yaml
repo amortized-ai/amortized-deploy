@@ -1,0 +1,170 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "studio-gateway.fullname" . }}
+  labels:
+    {{- include "studio-gateway.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "studio-gateway.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "studio-gateway.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "studio-gateway.serviceAccountName" . }}
+      containers:
+        # oauth-proxy authenticates the OpenShift user and forwards identity as
+        # X-Forwarded-User to the gateway on localhost:8080.
+        - name: oauth-proxy
+          image: {{ .Values.oauthProxy.image }}
+          ports:
+            - name: public
+              containerPort: 8443
+          args:
+            - --provider=openshift
+            - --https-address=:8443
+            - --http-address=
+            - --openshift-service-account={{ include "studio-gateway.serviceAccountName" . }}
+            - --upstream=http://localhost:8080
+            - --tls-cert=/etc/tls/private/tls.crt
+            - --tls-key=/etc/tls/private/tls.key
+            - --cookie-secret-file=/etc/proxy/secrets/session_secret
+            - --email-domain=*
+            - --skip-provider-button
+            - --pass-user-headers=true
+            - --cookie-samesite=none
+            - --cookie-secure=true
+          volumeMounts:
+            - name: proxy-tls
+              mountPath: /etc/tls/private
+            - name: proxy-cookie
+              mountPath: /etc/proxy/secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          {{- with .Values.resources.oauthProxy }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        - name: gateway
+          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          {{- with .Values.morty.keySecret }}
+          # openai/anthropic key(s) loaded into the gateway env so the openshell CLI's
+          # --auto-providers attaches them to each user's sandbox.
+          envFrom:
+            - secretRef:
+                name: {{ . }}
+          {{- end }}
+          env:
+            - name: PORT
+              value: "8080"
+            - name: EMBED_BASE_PATH
+              value: {{ .Values.embedBasePath | quote }}
+            - name: MLFLOW_UPSTREAM
+              value: {{ .Values.mlflow.upstream | quote }}
+            - name: MLFLOW_CA_FILE
+              value: {{ .Values.mlflow.caFile | quote }}
+            - name: SHARED_MLFLOW_TRACKING_URI
+              value: {{ .Values.mlflow.trackingUri | quote }}
+            - name: AMORTIZED_CHART_OCI
+              value: {{ .Values.chart.oci | quote }}
+            - name: AMORTIZED_CHART_VERSION
+              value: {{ required "studio-gateway: chart.version is required — pin the core amortized chart version to install per user" .Values.chart.version | quote }}
+            - name: OPENSHELL_MTLS_DIR
+              value: {{ .Values.openshell.mtlsDir | quote }}
+            - name: OPENSHELL_GATEWAY
+              value: {{ .Values.openshell.gateway | quote }}
+            - name: OPENSHELL_ENDPOINT
+              value: {{ .Values.openshell.endpoint | quote }}
+            - name: OPENSHELL_NAMESPACE
+              value: {{ .Values.openshell.namespace | quote }}
+            - name: OPENSHELL_SERVICE
+              value: {{ .Values.openshell.service | quote }}
+            - name: MORTY_IMAGE
+              value: {{ .Values.morty.image | quote }}
+            - name: MORTY_MODEL_PROVIDER
+              value: {{ .Values.morty.modelProvider | quote }}
+            - name: MORTY_MODEL
+              value: {{ .Values.morty.model | quote }}
+            - name: MORTY_ADC_FILE
+              value: {{ .Values.morty.adcFile | quote }}
+            - name: GOOGLE_CLOUD_PROJECT
+              value: {{ .Values.morty.googleCloudProject | quote }}
+            - name: VERTEX_LOCATION
+              value: {{ .Values.morty.vertexLocation | quote }}
+            - name: GPU_PER_USER
+              value: {{ .Values.gpuPerUser | quote }}
+            {{- with .Values.teacherKeysDir }}
+            - name: TEACHER_KEYS_DIR
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.serverImageTag }}
+            - name: AMORTIZED_SERVER_IMAGE_TAG
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.pluginUpstream }}
+            - name: PLUGIN_UPSTREAM
+              value: {{ . | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: openshell-mtls
+              mountPath: {{ .Values.openshell.mtlsDir | quote }}
+              readOnly: true
+            - name: mlflow-ca
+              mountPath: /etc/mlflow-ca
+              readOnly: true
+            - name: morty-adc
+              mountPath: /etc/morty-adc
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          {{- with .Values.resources.gateway }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /gateway/healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /gateway/healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: proxy-tls
+          secret:
+            secretName: {{ include "studio-gateway.tlsSecretName" . }}
+        - name: proxy-cookie
+          secret:
+            secretName: {{ include "studio-gateway.cookieSecretName" . }}
+        # OpenShell gateway client cert (from the openshell-platform install / E1).
+        - name: openshell-mtls
+          secret:
+            secretName: {{ .Values.openshell.clientTlsSecret }}
+        # Service-CA bundle to verify the operator MLflow TLS cert.
+        - name: mlflow-ca
+          configMap:
+            name: openshift-service-ca.crt
+            items:
+              - key: service-ca.crt
+                path: service-ca.crt
+        # Shared Vertex ADC uploaded into each per-user sandbox (create out of band;
+        # optional so openai/anthropic deployments without an ADC still start).
+        - name: morty-adc
+          secret:
+            secretName: {{ .Values.morty.adcSecret }}
+            optional: true

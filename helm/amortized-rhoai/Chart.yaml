@@ -1,0 +1,22 @@
+apiVersion: v2
+name: amortized-rhoai
+description: >-
+  RHOAI tier for Amortized: the studio-gateway shared tier (per-user provisioner +
+  embedded Studio + oauth-proxy) and the embedded-nav registration in the RHOAI
+  dashboard, plus a hook that copies the OpenShell mTLS client cert into this release's
+  namespace. OpenShell itself (the shared agent-sandbox/gateway/SCC platform) is a
+  cluster-admin prerequisite installed into its own `openshell` namespace via the
+  openshell-platform chart (see install.sh). The per-user core app stack is pulled from
+  OCI at runtime by the gateway, so the standalone core chart
+  (oci://ghcr.io/amortized-ai/charts/amortized) is untouched and remains usable on its
+  own for non-RHOAI users.
+type: application
+version: 0.1.0
+# Default core-chart version the gateway installs per user (override via
+# studio-gateway.chart.version).
+appVersion: "0.2.0"
+dependencies:
+  - name: studio-gateway
+    version: 0.1.0
+    repository: "file://../studio-gateway"
+    condition: studio-gateway.enabled

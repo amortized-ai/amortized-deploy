@@ -1,0 +1,96 @@
+{{- if .Values.openshellClientTls.copy }}
+# RBAC for the openshell-client-tls copy hook. Pre-install/upgrade HOOKS (like the
+# copy Job) so they exist during the pre-install phase, before the gateway pod (a
+# main-phase resource) mounts the secret. Read the cert in the openshell namespace,
+# write it into this release's namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "amortized-rhoai.tlsCopyServiceAccount" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+---
+# Source namespace: read the generated client cert.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-copy-src
+  namespace: {{ .Values.openshellClientTls.sourceNamespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ .Values.openshellClientTls.secretName | quote }}]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-copy-src
+  namespace: {{ .Values.openshellClientTls.sourceNamespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "amortized-rhoai.tlsCopyServiceAccount" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-copy-src
+---
+# Destination namespace (this release): create/apply the copied secret.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-copy-dst
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ .Values.openshellClientTls.secretName | quote }}]
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-copy-dst
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "amortized-rhoai.tlsCopyServiceAccount" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-copy-dst
+{{- end }}

@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "studio-gateway.fullname" . }}
+  labels:
+    {{- include "studio-gateway.labels" . | nindent 4 }}
+  annotations:
+    # OpenShift service-ca operator issues the reencrypt serving cert oauth-proxy uses.
+    service.beta.openshift.io/serving-cert-secret-name: {{ include "studio-gateway.tlsSecretName" . }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "studio-gateway.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: public
+      port: 8443
+      targetPort: public
+---
+# Plain-HTTP Service the RHOAI dashboard's module-federation proxy points at.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "studio-gateway.fullname" . }}-http
+  labels:
+    {{- include "studio-gateway.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "studio-gateway.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

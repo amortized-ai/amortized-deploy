@@ -1,0 +1,70 @@
+{{- if .Values.openshellClientTls.copy }}
+# Pre-install/upgrade hook (weight -5, after its RBAC at -10): copy the OpenShell mTLS
+# client cert from the openshell namespace into this release's namespace so the gateway
+# pod can mount it. Runs before the main-phase gateway Deployment, so no mount wait.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "amortized-rhoai.fullname" . }}-tls-copy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "amortized-rhoai.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "amortized-rhoai.tlsCopyServiceAccount" . }}
+      restartPolicy: Never
+      containers:
+        - name: copy
+          image: {{ .Values.openshellClientTls.image | quote }}
+          imagePullPolicy: {{ .Values.openshellClientTls.imagePullPolicy }}
+          env:
+            - name: SRC_NS
+              value: {{ .Values.openshellClientTls.sourceNamespace | quote }}
+            - name: DST_NS
+              value: {{ .Release.Namespace | quote }}
+            - name: SECRET_NAME
+              value: {{ .Values.openshellClientTls.secretName | quote }}
+          command:
+            - python3
+            - -c
+            - |
+              import json, os, subprocess, sys
+
+              src = os.environ["SRC_NS"]
+              dst = os.environ["DST_NS"]
+              name = os.environ["SECRET_NAME"]
+
+              g = subprocess.run(["oc", "get", "secret", name, "-n", src, "-o", "json"],
+                                 capture_output=True, text=True)
+              if g.returncode:
+                  sys.stderr.write(g.stderr)
+                  sys.stderr.write(
+                      "\n'%s' not found in namespace '%s' — is openshell-platform installed there?\n"
+                      % (name, src))
+                  sys.exit(g.returncode)
+
+              s = json.loads(g.stdout)
+              # Rebuild a clean Secret in the destination namespace (drop
+              # resourceVersion/uid/ownerReferences/namespace-specific metadata).
+              new = {
+                  "apiVersion": "v1",
+                  "kind": "Secret",
+                  "metadata": {"name": name, "namespace": dst},
+                  "type": s.get("type", "Opaque"),
+                  "data": s.get("data", {}),
+              }
+              a = subprocess.run(["oc", "apply", "-n", dst, "-f", "-"],
+                                 input=json.dumps(new), capture_output=True, text=True)
+              sys.stdout.write(a.stdout)
+              sys.stderr.write(a.stderr)
+              sys.exit(a.returncode)
+{{- end }}

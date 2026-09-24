@@ -1,0 +1,50 @@
+{{- if .Values.pluginFrontend.enabled }}
+# The RHOAI dashboard plugin frontend — a Module Federation remote (nginx serving the
+# built bundle incl. remoteEntry.js). The gateway proxies /federated here; the dashboard
+# loads the nav module through the gateway. Frontend only (hybrid model: the gateway is
+# the backend, so the plugin's BFF is not used).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.pluginFrontend.serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.pluginFrontend.serviceName }}
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.pluginFrontend.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.pluginFrontend.serviceName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.pluginFrontend.serviceName }}
+        {{- include "amortized-rhoai.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: plugin
+          image: "{{ .Values.pluginFrontend.image.repository }}:{{ .Values.pluginFrontend.image.tag }}"
+          imagePullPolicy: {{ .Values.pluginFrontend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.pluginFrontend.port }}
+          resources:
+            {{- toYaml .Values.pluginFrontend.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.pluginFrontend.serviceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.pluginFrontend.serviceName }}
+    {{- include "amortized-rhoai.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: {{ .Values.pluginFrontend.serviceName }}
+  ports:
+    - name: http
+      port: {{ .Values.pluginFrontend.port }}
+      targetPort: http
+{{- end }}

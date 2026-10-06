@@ -110,6 +110,10 @@ spec:
             - name: AMORTIZED_SERVER_IMAGE_TAG
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.evalImageTag }}
+            - name: AMORTIZED_EVAL_IMAGE_TAG
+              value: {{ . | quote }}
+            {{- end }}
             {{- with .Values.pluginUpstream }}
             - name: PLUGIN_UPSTREAM
               value: {{ . | quote }}

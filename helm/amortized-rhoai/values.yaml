@@ -25,8 +25,10 @@ studio-gateway:
     # Published gateway image (public): studio-gateway:latest, published on main by #444.
     tag: latest
   chart:
-    # The core app chart version the gateway installs per user (pulled from OCI).
-    version: "0.2.0"
+    # Core app chart version the gateway installs per user (from OCI). Empty => the newest
+    # published chart (tracks latest; may be unstable). Pin a version for a reproducible release
+    # (a releases/<rel>.yaml sets this + the image tags).
+    version: ""
   mlflow:
     trackingUri: ""   # https URI of the RHOAI operator MLflow (enterprise mode)
     upstream: ""      # https origin for the /mlflow UI proxy (empty => /mlflow off)

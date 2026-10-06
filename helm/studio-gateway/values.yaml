@@ -22,7 +22,8 @@ embedBasePath: /amortized-studio-embed
 # The amortized CORE chart the gateway installs per user, pulled from OCI.
 chart:
   oci: oci://ghcr.io/amortized-ai/charts/amortized
-  # REQUIRED: pin the core chart version the gateway installs. Rendering fails if empty.
+  # Core chart version the gateway installs. Empty => the gateway pulls the newest published chart
+  # (tracks latest); set to pin a specific version for a reproducible release.
   version: ""
 
 # Enterprise (RHOAI operator) MLflow — the shared upstream.

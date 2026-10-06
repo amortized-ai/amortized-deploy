@@ -112,6 +112,10 @@ spec:
             - name: AMORTIZED_SERVER_IMAGE_TAG
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.jobImageTag }}
+            - name: AMORTIZED_JOB_IMAGE_TAG
+              value: {{ . | quote }}
+            {{- end }}
             {{- with .Values.pluginUpstream }}
             - name: PLUGIN_UPSTREAM
               value: {{ . | quote }}

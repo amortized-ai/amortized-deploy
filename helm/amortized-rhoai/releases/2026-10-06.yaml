@@ -1,19 +1,21 @@
 # Pinned release — 2026-10-06
 #
-# A reproducible set: the core chart structure + every image locked to one sha set, so restarts
-# and re-installs are byte-identical. Install (from helm/amortized-rhoai):
+# A reproducible set: the core chart structure + every image pinned to a fixed tag, so restarts
+# and re-installs are stable. Install (from helm/amortized-rhoai):
 #
 #   ./install.sh amortized-gateway -f releases/2026-10-06.yaml
 #
 # Source (amortized main): core chart 0.3.0; server + job images from e67d716 (#485); studio-gateway
-# from d4d901a (#487); morty and the dashboard plugin unchanged (bebb5c4 / b75d74d).
+# from d4d901a (#487); morty and the dashboard plugin unchanged (bebb5c4 / b75d74d). The training
+# image is built upstream (training-hub), pinned to the dev-embedding tag pending a stable 0.2.0.
 studio-gateway:
   chart:
     version: "0.3.0"                               # pin the per-user core chart structure
   image:
     tag: sha-d4d901a                               # studio-gateway
   serverImageTag: sha-e67d716                      # per-user server
-  jobImageTag: sha-e67d716                         # eval, data-designer (SDG), training, document
+  jobImageTag: sha-e67d716                         # eval, data-designer (SDG), document
+  trainingImageTag: dev-embedding                  # training (built upstream; dev tag -> 0.2.0 when cut)
   morty:
     image: ghcr.io/amortized-ai/morty:sha-bebb5c4  # OpenShell-sandboxed Morty
 pluginFrontend:

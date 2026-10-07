@@ -68,7 +68,8 @@ gpuPerUser: "1"
 # Optional passthroughs.
 teacherKeysDir: ""        # dir of provider-key files the gateway stamps into each user ns (SDG teacher)
 serverImageTag: ""        # override the core chart's server image tag
-jobImageTag: ""           # override the tag for ALL job images (eval, SDG, training, document); empty => :latest
+jobImageTag: ""           # override the tag for the CI job images (eval, SDG, document); empty => :latest
+trainingImageTag: ""      # override the training image tag (built upstream, separate lifecycle); empty => :latest
 pluginUpstream: ""        # PLUGIN_UPSTREAM: the dashboard MF-remote plugin frontend (optional)
 
 resources:

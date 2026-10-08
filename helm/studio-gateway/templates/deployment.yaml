@@ -76,8 +76,10 @@ spec:
               value: {{ .Values.mlflow.trackingUri | quote }}
             - name: AMORTIZED_CHART_OCI
               value: {{ .Values.chart.oci | quote }}
+            {{- with .Values.chart.version }}
             - name: AMORTIZED_CHART_VERSION
-              value: {{ required "studio-gateway: chart.version is required — pin the core amortized chart version to install per user" .Values.chart.version | quote }}
+              value: {{ . | quote }}
+            {{- end }}
             - name: OPENSHELL_MTLS_DIR
               value: {{ .Values.openshell.mtlsDir | quote }}
             - name: OPENSHELL_GATEWAY
@@ -112,6 +114,10 @@ spec:
             {{- end }}
             {{- with .Values.jobImageTag }}
             - name: AMORTIZED_JOB_IMAGE_TAG
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.trainingImageTag }}
+            - name: AMORTIZED_TRAINING_IMAGE_TAG
               value: {{ . | quote }}
             {{- end }}
             {{- with .Values.pluginUpstream }}

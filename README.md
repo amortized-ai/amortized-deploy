@@ -39,6 +39,24 @@ full cluster-admin RBAC breakdown, model-provider setup, and uninstall.
 > `VERTEX_LOCATION` defaults to `global`; override with
 > `--set studio-gateway.morty.vertexLocation=<region>`.
 
+## Latest vs pinned installs
+
+**By default `install.sh` tracks _latest_** — the newest images and core chart from `main`.
+Convenient, but it **can be unstable**: it moves as PRs merge, and pods re-pull `:latest` on
+restart, so an install can drift from under you.
+
+**For anything you need to reproduce or reason about** — demos, customer POCs, SSA testing —
+install a **pinned release** instead: a values file that locks every image **and** the core
+chart to one validated set of shas, so restarts and re-installs are byte-identical.
+
+| Install | Command (from `helm/amortized-rhoai`) | Use when |
+|---------|----------------------------------------|----------|
+| **Latest** — may be unstable | `./install.sh amortized-gateway` | newest build / quick look / dev |
+| **Pinned** — reproducible | `./install.sh amortized-gateway -f releases/<release>.yaml` | stability: demos, POCs, bug reports |
+
+Available pinned releases live in
+[`helm/amortized-rhoai/releases/`](helm/amortized-rhoai/releases/).
+
 ## What's in here
 
 | Chart | Purpose |

@@ -20,7 +20,8 @@ studio-gateway:
   image:
     tag: sha-<gateway>                # studio-gateway
   serverImageTag: sha-<server>        # per-user server (overrides the core chart default)
-  jobImageTag: sha-<jobs>             # eval, SDG (data-designer), training, document job images
+  jobImageTag: sha-<jobs>             # eval, SDG (data-designer), document job images
+  trainingImageTag: <tag>             # training image — built upstream, its own tag (e.g. dev-embedding)
   morty:
     image: ghcr.io/amortized-ai/morty:sha-<morty>
 pluginFrontend:
@@ -28,6 +29,8 @@ pluginFrontend:
     tag: sha-<plugin>                 # dashboard plugin (amortized-studio)
 ```
 
-Each image is pinned to the sha built from the release commit. Path-filtered CI means components
-can rebuild at different commits, so the shas may differ per image (a future unified release-tag
-workflow will collapse these to one version).
+Each amortized-CI image (server, jobs, studio-gateway) is pinned to the sha built from the release
+commit. Path-filtered CI means components can rebuild at different commits, so the shas may differ
+per image (a future unified release-tag workflow will collapse these to one version). The
+**training** image is the exception — it is built upstream (training-hub), so it is pinned to its
+own published tag (e.g. `dev-embedding`), not a release-commit sha.

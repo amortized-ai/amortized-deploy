@@ -1,0 +1,23 @@
+# Pinned release — 0.2.1
+#
+# A reproducible set: the core chart structure + every image pinned to the 0.2.1 release, so
+# restarts and re-installs are stable. Install (from helm/amortized-rhoai):
+#
+#   ./install.sh amortized-gateway -f releases/0.2.1.yaml
+#
+# Source: amortized v0.2.1 tag (GitHub release 0.2.1, #565); core chart 0.4.1; every control-plane
+# and job image at :0.2.1. The training image (built upstream, training-hub) is :0.2.1, retagged
+# from :latest at the v0.2.1 tag by containers.yml retag-training — verified present in ghcr.
+studio-gateway:
+  chart:
+    version: "0.4.1"                               # per-user core chart (OCI), 0.2.1 release
+  image:
+    tag: "0.2.1"                                   # studio-gateway
+  serverImageTag: "0.2.1"                          # per-user server (ghcr.io/amortized-ai/amortized)
+  jobImageTag: "0.2.1"                             # eval, data-designer (SDG), document
+  trainingImageTag: "0.2.1"                        # training (upstream; retagged from latest at v0.2.1)
+  morty:
+    image: ghcr.io/amortized-ai/morty:0.2.1        # OpenShell-sandboxed Morty
+pluginFrontend:
+  image:
+    tag: "0.2.1"                                   # dashboard plugin (amortized-studio)

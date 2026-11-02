@@ -13,7 +13,9 @@ rules:
     verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["pods", "pods/log"]
-    verbs: ["get", "list", "watch"]
+    # delete/deletecollection: restartServer deletes the server pods on a
+    # post-provision BYOK key add so the reconcile can recreate the Morty sandbox.
+    verbs: ["get", "list", "watch", "delete", "deletecollection"]
   - apiGroups: ["apps"]
     resources: ["deployments", "statefulsets"]
     verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]

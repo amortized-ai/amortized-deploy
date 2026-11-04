@@ -29,8 +29,8 @@ auto-discovers the RHOAI operator MLflow. See
 full cluster-admin RBAC breakdown, model-provider setup, and uninstall.
 
 > **Using Vertex for Morty chat?** The GCP project is baked into the gateway at install
-> time, so pass it now — OpenAI/Anthropic keys, by contrast, are added later in the Studio
-> UI and need no install flag:
+> time, so pass it now — OpenAI / Anthropic / MaaS / EnMaaS keys, by contrast, are added
+> later per-user in the Studio UI and need no install flag:
 >
 > ```bash
 > ./install.sh amortized-gateway --set studio-gateway.morty.googleCloudProject=<your-gcp-project>

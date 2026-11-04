@@ -53,8 +53,10 @@ Also required:
 - **Network egress** to pull (in-cluster) the public artifacts: `ghcr.io/amortized-ai/studio-gateway`,
   `ghcr.io/amortized-ai/amortized-studio`, and `oci://ghcr.io/amortized-ai/charts/amortized`.
 - **Tooling** on the operator's machine: `oc` (logged in) + `helm` v3+.
-- Model-provider creds for Morty in the gateway namespace (Vertex `morty-adc`, or an
-  OpenAI/Anthropic key secret) — see `studio-gateway` values.
+- Model-provider creds for Morty. Only **Vertex** is set at install time — the GCP project
+  (`--set studio-gateway.morty.googleCloudProject=...`) + a `morty-adc` ADC secret in the
+  gateway namespace. **OpenAI / Anthropic / MaaS / EnMaaS** are BYOK, added per-user in the
+  Studio **Settings** UI after install (no prereq) — see `studio-gateway` values.
 
 `openshell-client-tls` is **not** a manual step — the OpenShell install generates it in
 the `openshell` namespace and this chart's hook copies it in.

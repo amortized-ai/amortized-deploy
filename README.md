@@ -28,9 +28,9 @@ auto-discovers the RHOAI operator MLflow. See
 [`helm/amortized-rhoai/README.md`](helm/amortized-rhoai/README.md) for prerequisites, the
 full cluster-admin RBAC breakdown, model-provider setup, and uninstall.
 
-> **Using Vertex for Morty chat?** The GCP project is baked into the gateway at install
-> time, so pass it now — OpenAI / Anthropic / MaaS / EnMaaS keys, by contrast, are added
-> later per-user in the Studio UI and need no install flag:
+> **Using Vertex for Morty chat?** Only the GCP **project** is baked into the gateway at
+> install time, so pass it now; the **ADC credentials** — like the OpenAI / Anthropic / MaaS /
+> EnMaaS keys — are added later per-user in the Studio UI (BYOK) and need no install flag:
 >
 > ```bash
 > ./install.sh amortized-gateway --set studio-gateway.morty.googleCloudProject=<your-gcp-project>
@@ -38,6 +38,9 @@ full cluster-admin RBAC breakdown, model-provider setup, and uninstall.
 >
 > `VERTEX_LOCATION` defaults to `global`; override with
 > `--set studio-gateway.morty.vertexLocation=<region>`.
+>
+> **GPUs per user** default to **1** (a per-user ResourceQuota the provisioner applies). Bump
+> it at install time for bigger jobs: `--set studio-gateway.gpuPerUser=<n>`.
 
 ## Latest vs pinned installs
 
